@@ -1,0 +1,6 @@
+
+User:  Oh, you're listening now.
+Assistant: Sorry, I had an internal error.
+
+User:  Tell me what's wrong.
+Assistant: Sorry, I had an internal error.

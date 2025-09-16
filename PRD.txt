@@ -1,0 +1,121 @@
+📝 Product Requirements Document (PRD)
+
+Project: JarvisAssistant (Windows Portable Edition)
+Created by: No One
+Version: 1.0
+
+⸻
+
+1. Overview
+
+JarvisAssistant is a fully offline, portable AI assistant packaged as a standalone Windows application. It integrates speech recognition, text-to-speech, conversational AI (LLaMA 3), and a Flet-based UI into a self-contained .exe. Jarvis runs directly from local files (HDD, SSD, or USB stick), requiring no external installations.
+
+⸻
+
+2. Goals
+	•	Deliver an offline-first assistant with strong conversational logic.
+	•	Eliminate dependency on external apps (no Ollama, no LM Studio, no Google).
+	•	Provide plug-and-play usability: double-click JarvisAssistant.exe → fully functional.
+	•	Enable self-updates via lightweight pings (RSS/JSON) when online, without breaking offline mode.
+	•	Offer a future-proof modular design where users can drop in new models or voices.
+
+⸻
+
+3. Folder Structure
+
+JarvisAssistant/
+│
+├── JarvisAssistant.exe   # main launcher
+├── /bin                  # runtime binaries
+│   ├── llama.cpp.exe
+│   ├── whisper.cpp.exe
+│   ├── ffmpeg.exe
+│   └── supporting DLLs
+│
+├── /models
+│   ├── llama3-8b-q4.gguf      # bundled LLaMA 3 model
+│   ├── whisper-small.bin      # bundled Whisper model
+│   └── voices/
+│       ├── jamie-voice.bin
+│       └── fallback-tts.bin
+│
+├── /scripts
+│   ├── dispatcher.py
+│   ├── reasoning.py
+│   ├── skills.py
+│   ├── jarvis_commands.py
+│   └── speaker.py
+│
+├── /ui
+│   ├── avatar_loop.mp4
+│   ├── theme.json
+│   └── assets/
+│
+├── /updates                  # downloaded patches & new models
+└── /logs                     # runtime logs and error reports
+
+
+⸻
+
+4. Functional Requirements
+
+Core Features
+	•	Voice Input: Faster-Whisper (offline speech recognition).
+	•	Voice Output: Local TTS (Jamie fallback voice + optional packaged models).
+	•	Reasoning: LLaMA 3 model for natural dialogue + command handling.
+	•	Commands/Skills: Extensible via skills.py and jarvis_commands.py.
+	•	UI: Flet-based desktop app with avatar loop and status indicators.
+	•	Memory: JSON-based local memory for persistence (no cloud sync).
+
+Conversation Defaults
+	•	If no command match is found → fall back to open-ended dialogue with LLaMA 3.
+	•	Prevents “dead ends” caused by misheard or ambiguous speech.
+	•	Ensures Jarvis always responds, either as assistant or conversational partner.
+
+Update System
+	•	Check RSS/JSON endpoint (optional, minimal online ping).
+	•	Download patches or new models into /updates.
+	•	Apply on restart.
+
+⸻
+
+5. Dependencies (Bundled Internally)
+	•	Python runtime (embedded, invisible to user).
+	•	flet (for UI).
+	•	llama.cpp (Windows build) for LLaMA inference.
+	•	whisper.cpp (Windows build) for speech recognition.
+	•	ffmpeg (Windows build) for audio.
+	•	PyInstaller/Nuitka → for packaging into .exe.
+	•	No external downloads required by end user.
+
+⸻
+
+6. Distribution
+	•	Distributed as a self-extracting .exe installer.
+	•	Can also be zipped and copied directly onto a USB stick.
+	•	Entire package size: ~10–15 GB depending on bundled models.
+
+⸻
+
+7. Future Roadmap
+	•	Model Switching: Allow drag-and-drop .gguf models into /models.
+	•	Custom Voices: Add more voices in /models/voices.
+	•	Multi-Modal Input: Vision models for image-based queries (later).
+	•	Local Knowledge Base: Integrate with user documents for contextual Q&A.
+	•	Plugin System: Drop-in skills for home automation, media control, etc.
+	•	Cross-Platform Expansion: Package for macOS and Linux using equivalent binaries.
+
+⸻
+
+8. Risks & Mitigations
+	•	Large installer size (10–15 GB): Use optional “Lite” builds with smaller models.
+	•	Updates breaking: Maintain /updates rollback mechanism.
+	•	Hardware variance: Default to quantized models for wide compatibility.
+
+⸻
+
+9. Success Criteria
+	•	Runs offline out-of-the-box on any Windows PC.
+	•	Minimal setup → no user installs beyond unzipping or running installer.
+	•	Smooth conversational flow with fallback to dialogue.
+	•	Easy to update without requiring technical knowledge.

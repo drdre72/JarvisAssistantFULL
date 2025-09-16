@@ -1,0 +1,56 @@
+# Large model files (download separately)
+models/*.gguf
+models/*.bin
+
+# Large CUDA binaries (download via install script)
+bin/ggml-cuda.dll
+bin/*.exe
+
+# Backup directories
+bin-cpu-backup/
+
+# Cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+
+# Logs
+logs/
+*.log
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Memory files (user data)
+memory/
+chat_memory.json
+jarvis_memory.json
+
+# Large binary files
+*.mp4
+*.avi
+*.mov
+*.pdf
+*.png
+*.jpg
+*.jpeg
+
+# Embedded repositories
+whisper-source/
+
+# Package managers
+node_modules/
+package-lock.json
+
+# Updates directory
+updates/

@@ -1,0 +1,52 @@
+your task is to fully implement a macOS-focused automation tool called Grep directly within a single Replit workspace. Grep is a powerful yet streamlined text and automation management application explicitly optimized for real-time clarity and visibility during ChatGPT-assisted interactions.
+Your deliverable must be explicitly structured for a one-shot creation within Replit, emphasizing clearly visible printed outputs, direct interaction logging, and intuitive UI management entirely within the console.
+
+Complete Application Requirements:
+1. Explicitly Visible Replit Control Panel:
+	•	Automatically launched when the Replit workspace opens.
+	•	Explicitly display intuitive search input fields, action buttons, and immediate search result displays via clearly labeled and structured console outputs.
+	•	Provide a prominently visible Launch Editor button clearly printed as selectable text-based menu options in the Replit console.
+2. Real-Time Text Capture & Print Functionality (Optimized for ChatGPT):
+	•	Clearly log every step explicitly to the console, enabling ChatGPT to immediately interpret every operational output without interference from behind-the-scenes animations or hidden interactions.
+	•	Explicitly print all captured or user-input text to the Replit console immediately upon action, clearly labeled with timestamps and descriptive identifiers to assist troubleshooting.
+	•	Automatically log detailed console messages for all script triggers, search queries, and captured text interactions clearly for easy visual tracking.
+3. Integrated Text Editor Explicitly Managed within Replit:
+	•	Embed a fully functional, minimalistic text editor simulated directly within the Replit console:
+	◦	Default dark mode clearly stated (black background, green font).
+	◦	Explicitly selectable light mode and plain text mode via visibly printed menu options in the console.
+	•	Open new blank documents explicitly by default, clearly indicated in the console with a timestamped print statement to confirm the editor's status at each instance.
+4. Enterprise-Level Security & Explicit Authentication:
+	•	Explicitly prompt users with a highly visible authentication request upon each app launch.
+	•	Simulate secure macOS-level authentication (Touch ID/fingerprint or password), clearly printed in the Replit console to ensure users and ChatGPT clearly understand authentication status at all times.
+	•	Clearly outline in the console visible steps to escalate or adapt the authentication to enterprise-level security standards.
+5. Backend Automation & Scripts:
+	•	Implement explicit backend scripts using Python 3.11 clearly organized in the Replit filesystem:
+	◦	Visible search and automation scripts explicitly structured with real-time logging clearly printed to the console for every action and result.
+	◦	Clear management of scripts to minimize permission conflicts, visibly confirmed in the console.
+6. GitHub Integration Clearly Explained:
+	•	Explicitly structured auto-sync capability using built-in Replit GitHub integration clearly visible through console print statements upon every push or pull event.
+	•	Provide explicitly logged confirmation messages in the console whenever synchronization occurs.
+7. Clear Performance & Stability Optimization:
+	•	Explicitly print real-time console updates, error messages, and script execution statuses.
+	•	Include timestamped and explicitly labeled logging to clearly track actions and identify issues instantly, optimizing troubleshooting visibility during interactions with ChatGPT.
+8. Advanced Text Searching and Regex Integration:
+	•	Provide explicitly logged regex and metadata-based search capabilities immediately printed to the console upon execution.
+	•	Clearly print explicit results from indexing or metadata extraction directly into the Replit console.
+
+Tempo.AI One-Shot Explicit Deliverables in Replit:
+Your full implementation must explicitly provide:
+	1	Main.py – An explicitly visible main Python script clearly structuring app launch, authentication simulation, control panel display, and user interaction clearly logged and printed in real-time.
+	2	Editor.py – Explicitly detailed embedded text editor functionality clearly simulated in Replit's console with selectable UI modes explicitly logged.
+	3	Automation.py – Clearly structured automation and search scripts with explicit logging at every step.
+	4	Security.py – Explicitly simulated macOS-level authentication clearly displayed through interactive console prints.
+	5	Integration.md – Clear documentation explicitly detailing the GitHub synchronization setup within Replit.
+
+Explicit Interaction and Visibility Optimization:
+	•	Ensure every operation (inputs, outputs, state changes) is explicitly printed and clearly labeled, optimizing the ability for ChatGPT to interact, troubleshoot, and verify app performance without ambiguity or hidden interactions.
+	•	Provide explicit timestamped logging for clarity in live troubleshooting.
+
+Implement the Grep app explicitly structured for optimal, clearly visible interactions and immediate real-time feedback within the Replit environment, fully optimized for troubleshooting and iterative development supported explicitly by ChatGPT interactions.
+2/2
+
+Ask ChatGPT
+
