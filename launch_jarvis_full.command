@@ -27,12 +27,7 @@ launch_in_terminal() {
 # Note: JARVIS Avatar is now embedded in the Flet UI
 echo "👁️ JARVIS Avatar will be embedded in the main interface..."
 
-# Launch Voice Recognition Backend
-echo "🎤 Starting Voice Recognition System..."
-launch_in_terminal "Voice Backend" "python scripts/wake_listener.py"
-
-# Small delay between launches
-sleep 1
+# Legacy wake-word listener is retired; use the UI microphone control instead.
 
 # Launch Flet UI
 echo "💻 Starting JARVIS Interface..."
@@ -41,11 +36,11 @@ launch_in_terminal "Flet UI" "python jarvis_app.py"
 echo ""
 echo "✅ All JARVIS systems are initializing..."
 echo "👁️ Avatar video: Embedded in main interface"
-echo "🎤 Voice backend: Terminal window"
+echo "Voice wake word: Disabled; use the UI microphone control"
 echo "💻 Main interface: Flet application"
 echo ""
-echo "🎯 Ready for activation with wake word or UI interaction"
-echo "🔊 Say 'Jarvis' to begin voice interaction"
+echo "Use the UI microphone control for voice interaction"
+
 echo ""
 echo "To stop all systems:"
 echo "  - Close terminal windows"

@@ -10,6 +10,8 @@ import threading
 import time
 from pathlib import Path
 
+from runtime_log import get_runtime_logger
+
 class LlamaReasoning:
     def __init__(self, model_path=None, context_size=4096):
         """Initialize LLaMA reasoning engine with llama.cpp"""
@@ -21,11 +23,11 @@ class LlamaReasoning:
 
         # Default model path
         if model_path is None:
-            model_path = self.models_path / "llama3-8b-q4.gguf"
+            model_path = self.models_path / "qwen2.5-7b-instruct-q4_k_m.gguf"
 
         self.model_path = Path(model_path)
         self.context_size = context_size
-        self.llama_exe = self.bin_path / "llama-cli.exe"
+        self.llama_exe = self.bin_path / "llama-completion.exe"
 
         # Conversation memory
         self.conversation_history = []
@@ -57,32 +59,47 @@ class LlamaReasoning:
         # Build full prompt with conversation history
         full_prompt = self._build_prompt(prompt, system_prompt)
 
-        # Construct llama.cpp command - simplified for stability testing
+        # GPU layer offload: 0 for the bundled CPU build; raise via
+        # JARVIS_GPU_LAYERS when a GPU-enabled llama.cpp build is staged.
+        gpu_layers = os.environ.get("JARVIS_GPU_LAYERS", "0")
+        threads = os.environ.get(
+            "JARVIS_LLAMA_THREADS", str(min(8, os.cpu_count() or 4))
+        )
+        timeout = int(os.environ.get("JARVIS_LLAMA_TIMEOUT", "120"))
+
         cmd = [
             str(self.llama_exe),
             "-m", str(self.model_path),
             "-p", full_prompt,
             "-n", str(max_tokens),
             "--temp", str(temperature),
-            "-c", "1024",  # Smaller context for testing
-            "-ngl", "33",  # All layers to GPU (test if this works)
-            "--threads", "4",  # Conservative threading
-            "--batch-size", "256",  # Smaller batch for testing
-            "--no-warmup",  # Skip warmup
-            "-v",  # Verbose output to see what's happening
+            "-c", str(self.context_size),
+            "-ngl", gpu_layers,
+            "--threads", threads,
+            "--batch-size", "256",
+            "--no-warmup",
+            "-v",
         ]
 
+        stage = "intent" if system_prompt and "JSON" in system_prompt else "reply"
+        print(f"[LlamaReasoning] Starting {stage} inference locally...", flush=True)
+        logger = get_runtime_logger()
+        logger.info("%s inference started max_tokens=%s timeout=%ss", stage, max_tokens, timeout)
+        start = time.monotonic()
+        outcome = "error"
         try:
             # Run llama.cpp and capture output
             result = subprocess.run(
                 cmd,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
-                timeout=30  # Reduced timeout to prevent hanging
+                timeout=timeout
             )
 
             if result.returncode == 0:
+                outcome = "ok"
                 response = result.stdout.strip()
 
                 # Parse response to extract only the assistant's part
@@ -99,8 +116,13 @@ class LlamaReasoning:
                 clean_lines = []
                 for line in lines:
                     line = line.strip()
-                    if line and not line.startswith('System:') and not line.startswith('User:') and not line.startswith('Assistant:'):
-                        clean_lines.append(line)
+                    if not line:
+                        continue
+                    if line.startswith(('System:', 'User:', 'Assistant:', '> ')):
+                        continue
+                    if line.startswith('[') and 't/s' in line:
+                        continue
+                    clean_lines.append(line)
 
                 response = ' '.join(clean_lines).strip()
 
@@ -120,6 +142,7 @@ class LlamaReasoning:
 
                 return response
             else:
+                outcome = f"exit_{result.returncode}"
                 error_msg = result.stderr or "Unknown llama.cpp error"
                 print(f"[LlamaReasoning] Error: {error_msg}")
                 # Return JSON-compatible response for dispatcher compatibility
@@ -128,17 +151,24 @@ class LlamaReasoning:
                 return "I'm having trouble thinking right now. Please try again."
 
         except subprocess.TimeoutExpired:
+            outcome = "timeout"
             print("[LlamaReasoning] Response generation timed out")
             # Return a JSON-compatible response for dispatcher compatibility
             if system_prompt and "JSON" in system_prompt:
                 return '{"intent": "unrecognized", "entities": {}}'
             return "I apologize, but my response is taking longer than expected. Please try rephrasing your request."
         except Exception as e:
+            outcome = "exception"
             print(f"[LlamaReasoning] Unexpected error: {e}")
             # Return JSON-compatible response for dispatcher compatibility
             if system_prompt and "JSON" in system_prompt:
                 return '{"intent": "unrecognized", "entities": {}}'
             return "I encountered an unexpected issue. Please try again."
+        finally:
+            elapsed = time.monotonic() - start
+            message = f"{stage} inference {outcome} after {elapsed:.1f}s"
+            print(f"[LlamaReasoning] {message}", flush=True)
+            logger.info(message)
 
     def _build_prompt(self, user_input, system_prompt=None):
         """Build complete prompt with system instruction and conversation history"""

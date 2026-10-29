@@ -14,40 +14,28 @@ base_dir = os.path.dirname(script_dir)  # Go up one level from /scripts
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
-# Import JARVIS modules for portable structure
-try:
-    from jarvis_commands import commands
-    from speaker import speak  # Fixed import - use speaker.py, not text_to_speech.py
-    from dispatcher import process as process_command
-    from reasoning import get_reasoning_engine
-    from memory_system import get_memory_system, remember_conversation, get_conversation_context
+# Required offline modules must fail loudly rather than silently disabling
+# speech, commands, and memory while the UI appears to work.
+from jarvis_commands import commands
+from speaker import speak
+from dispatcher import process as process_command
+from reasoning import get_reasoning_engine
+from obsidian_memory import remember_conversation, get_conversation_context
+from speech_recognition import WhisperSTT
 
-    # Import speech recognition class
-    from speech_recognition import WhisperSTT
-    _whisper_stt = None
+_whisper_stt = None
 
-    def listen_and_transcribe(duration=5):
-        """Wrapper function for speech recognition"""
-        global _whisper_stt
-        try:
-            if _whisper_stt is None:
-                _whisper_stt = WhisperSTT()
-            return _whisper_stt.listen_and_transcribe(duration=duration)
-        except Exception as e:
-            print(f"[WhisperSTT] Error: {e}")
-            return ""
 
-except ImportError as e:
-    print(f"Warning: Could not import JARVIS modules: {e}")
-    # Create dummy functions for testing
-    def speak(text): print(f"JARVIS: {text}")
-    def listen_and_transcribe(duration=5): return ""
-    def process_command(text): return "CONTINUE_LOOP"
-    commands = {}
-    def get_reasoning_engine(): return None
-    def get_memory_system(): return None
-    def remember_conversation(user, assistant, session=None): pass
-    def get_conversation_context(limit=5): return ""
+def listen_and_transcribe(duration=5):
+    """Wrapper function for speech recognition."""
+    global _whisper_stt
+    try:
+        if _whisper_stt is None:
+            _whisper_stt = WhisperSTT()
+        return _whisper_stt.listen_and_transcribe(duration=duration)
+    except Exception as e:
+        print(f"[WhisperSTT] Error: {e}")
+        return ""
 
 # Import flet-video for proper video support
 try:
@@ -149,13 +137,13 @@ class JarvisApp:
         
         # Default to windowed mode for development
         # TODO: Add fullscreen toggle button for production mode
-        self.page.window.maximized = False
-        self.page.window.always_on_top = False
-        self.page.window.full_screen = False
+        self.page.window_maximized = False
+        self.page.window_always_on_top = False
+        self.page.window_full_screen = False
 
         # Set reasonable development window size
-        self.page.window.width = 1200
-        self.page.window.height = 800
+        self.page.window_width = 1200
+        self.page.window_height = 800
         
         # Configure color scheme
         self.page.theme = ft.Theme(
@@ -331,11 +319,11 @@ class JarvisApp:
                 ),
                 self.voice_button,  # Just reference here
                 ft.ElevatedButton(
-                    "JARVIS Avatar",
-                    icon="play_circle" if not self.avatar_playing else "stop_circle",
-                    bgcolor=ORANGE if self.avatar_playing else "#2a2a2a",
-                    color=WHITE if self.avatar_playing else ORANGE,
-                    on_click=self.toggle_avatar_video,
+                    "Avatar (not available)",
+                    icon="play_circle",
+                    bgcolor="#2a2a2a",
+                    color=ORANGE,
+                    disabled=True,
                 ),
             ], spacing=10),
             bgcolor="#1a1a1a",
@@ -431,6 +419,8 @@ class JarvisApp:
                 on_click=self.on_chat_submit,
             )
         ])
+
+        self.activity_text = ft.Text("", size=12, color=WHITE70)
         
         # Create main content area with JARVIS positioned to the right
         main_content = ft.Column([
@@ -443,6 +433,7 @@ class JarvisApp:
             ),
             ft.Text("Command Center", size=20, weight=ft.FontWeight.BOLD),
             chat_area,
+            self.activity_text,
             chat_input_row,
         ])
         
@@ -504,6 +495,11 @@ class JarvisApp:
         
         # Process command through JARVIS system
         self.process_user_command(user_input)
+
+    def set_activity(self, message):
+        """Show progress during local inference without storing it as conversation."""
+        self.activity_text.value = message
+        self.page.update()
     
     def process_user_command(self, user_input):
         """Process user command through JARVIS system"""
@@ -521,16 +517,18 @@ class JarvisApp:
                 return
             
             # Use JARVIS dispatcher to process command
+            self.set_activity("Checking your request locally...")
             result = process_command(user_input)
             
             # If no specific command found, use conversation mode
             if result == 'CONTINUE_LOOP':
+                self.set_activity("Generating a reply locally...")
                 # Send to conversation AI using our reasoning engine
                 try:
                     reasoning_engine = get_reasoning_engine()
                     if reasoning_engine:
                         # Include conversation context for better responses
-                        context = get_conversation_context(3)
+                        context = get_conversation_context(3, query=user_input)
                         enhanced_prompt = self.create_jarvis_persona_prompt()
                         if context:
                             enhanced_prompt += f"\n\nRecent conversation context:\n{context}"
@@ -542,10 +540,14 @@ class JarvisApp:
                             temperature=0.7
                         )
                         self.add_chat_message("Jarvis", assistant_response, True)
+                        try:
+                            remember_conversation(user_input, assistant_response)
+                        except (OSError, ValueError) as memory_error:
+                            print(f"[Memory] Conversation save failed: {memory_error}")
+                            self.add_chat_message(
+                                "Jarvis", "I could not save this conversation to local memory.", True
+                            )
                         speak(assistant_response)
-
-                        # Store conversation in memory
-                        remember_conversation(user_input, assistant_response)
                     else:
                         raise Exception("Reasoning engine not available")
 
@@ -558,13 +560,25 @@ class JarvisApp:
             print(f"Command processing error: {e}")
             self.add_chat_message("Jarvis", "I encountered an error processing that command, sir.", True)
             speak("I encountered an error processing that command.")
+        finally:
+            self.set_activity("")
 
     def create_jarvis_persona_prompt(self):
         """Create the JARVIS persona prompt for conversation mode"""
         return """You are JARVIS (Just A Rather Very Intelligent System), Tony Stark's AI assistant. 
         You are sophisticated, polite, and efficient. You address the user as "sir" and maintain a professional yet friendly demeanor.
         You are helpful, intelligent, and have a slight sense of humor when appropriate.
-        Keep responses concise but informative. You are currently running on the user's desktop system."""
+        Keep responses concise but informative. You are running entirely offline.
+        You can converse using local speech input and output. The app shows
+        basic CPU and memory status, and the supported voice command "write
+        this down" saves a local note. If asked about your tools, explain these
+        available capabilities rather than saying you have no tools.
+        Obsidian memory is a local Markdown vault. Recent dialogue is
+        unverified, model replies are generated content, and only user-reviewed
+        Knowledge notes are approved memories, not independently proven facts.
+        Never present a memory proposal or imagination as a verified fact.
+        You cannot inspect arbitrary tools or your screen, browse the internet,
+        or run arbitrary commands. Do not claim capabilities that are not implemented."""
 
     # Quick Action Functions
     def open_terminal(self, e):
@@ -643,8 +657,9 @@ class JarvisApp:
                         if consecutive_empty >= max_empty:
                             print("[Voice] No speech detected, going back to sleep")
                             self.is_listening = False
-                            self.add_chat_message("Jarvis", "Going back to sleep, sir. Say 'Jarvis' to wake me.", True)
-                            speak("Going back to sleep, sir. Say 'Jarvis' to wake me.")
+                            idle_message = "Voice listening paused, sir. Use the microphone button to resume."
+                            self.add_chat_message("Jarvis", idle_message, True)
+                            speak(idle_message)
                             break
                     else:
                         # Reset counter on successful transcription

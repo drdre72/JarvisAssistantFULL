@@ -182,14 +182,14 @@ def conversation_mode(args: dict):
     return 'CONTINUE_LOOP' # Ensure we continue listening after conversation.
 
 def write_this_down(args: dict):
-    """Saves provided text content to a notes file."""
+    """Save an explicit user note to the local Obsidian vault."""
     content_to_save = args.get("content")
     if not content_to_save:
         return "Sir, what would you like me to write down?"
     try:
-        log_entry = {"command": "write_this_down", "content": content_to_save}
-        update_memory(log_entry, "notes_log.txt")
-        return "Note taken, sir."
+        from obsidian_memory import get_brain
+        get_brain().save_note(content_to_save)
+        return "Note saved in your local Obsidian vault, sir."
     except Exception as e:
         print(f"[COMMAND] ERROR in write_this_down: {e}")
         return "I'm sorry, sir. I encountered an error while trying to take that note."
@@ -297,19 +297,8 @@ def stop_avatar_video(args: dict):
         print(f"[COMMAND] ERROR in stop_avatar_video: {e}")
         return "I encountered an issue with the avatar video system, sir."
 
-# --- UNIFIED COMMAND DICTIONARY ---
+# Only implemented Windows/offline actions belong in the voice dispatcher.
+# Legacy AppleScript, avatar and placeholder functions above are unsupported.
 commands = {
-    "speak freely": conversation_mode,
-    "clear the workspace": clear_workspace,
-    "open dev environment": open_dev_environment,
     "write this down": write_this_down,
-    "security lockdown": security_lockdown,
-    "take a screenshot": take_screenshot,
-    "open_application": open_application,
-    "show yourself": start_avatar_video,
-    "activate avatar": start_avatar_video,
-    "start avatar video": start_avatar_video,
-    "hide yourself": stop_avatar_video,
-    "deactivate avatar": stop_avatar_video,
-    "stop avatar video": stop_avatar_video,
 }

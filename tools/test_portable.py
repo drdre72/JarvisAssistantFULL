@@ -7,17 +7,19 @@ import sys
 import os
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 def test_portable_structure():
     """Test that the portable structure is correct"""
 
     print("🔍 Testing JarvisAssistant Portable Structure")
     print("=" * 50)
 
-    base_dir = Path(__file__).parent
+    base_dir = PROJECT_ROOT
     required_dirs = ["bin", "models", "scripts", "ui", "memory", "logs", "updates"]
     required_files = {
-        "bin/llama-cli.exe": "LLaMA CLI executable",
-        "models/llama3-8b-q4.gguf": "LLaMA 3 8B model",
+        "bin/llama-completion.exe": "llama.cpp completion executable",
+        "models/qwen2.5-7b-instruct-q4_k_m.gguf": "Local GGUF model",
         "scripts/reasoning.py": "Reasoning engine",
         "scripts/speech_recognition.py": "Speech recognition",
         "scripts/text_to_speech.py": "Text-to-speech",
@@ -66,7 +68,7 @@ def test_python_imports():
     print("-" * 30)
 
     # Add scripts to path
-    scripts_dir = Path(__file__).parent / "scripts"
+    scripts_dir = PROJECT_ROOT / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
 
@@ -127,9 +129,9 @@ def test_binaries():
     print("\n⚙️ Binary Executables:")
     print("-" * 30)
 
-    bin_dir = Path(__file__).parent / "bin"
+    bin_dir = PROJECT_ROOT / "bin"
     required_binaries = [
-        "llama-cli.exe",
+        "llama-completion.exe",
         "llama.dll",
         "ggml.dll"
     ]
@@ -153,10 +155,10 @@ def test_models():
     print("\n🧠 AI Models:")
     print("-" * 30)
 
-    models_dir = Path(__file__).parent / "models"
+    models_dir = PROJECT_ROOT / "models"
 
     # Test LLaMA model
-    llama_model = models_dir / "llama3-8b-q4.gguf"
+    llama_model = models_dir / "qwen2.5-7b-instruct-q4_k_m.gguf"
     if llama_model.exists():
         size = llama_model.stat().st_size / (1024**3)  # GB
         print(f"✅ LLaMA 3 8B model ({size:.2f} GB)")
@@ -174,7 +176,7 @@ def run_functionality_test():
     print("-" * 30)
 
     # Add scripts to path
-    scripts_dir = Path(__file__).parent / "scripts"
+    scripts_dir = PROJECT_ROOT / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
 

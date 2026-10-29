@@ -8,64 +8,58 @@
    cd JarvisAssistantFULL
    ```
 
-2. **Download the LLaMA 3 Model**
-   Download `llama3-8b-q4.gguf` (4.6GB) from HuggingFace and place it in the `models/` directory:
-   ```
-   https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf
-   ```
-   Rename it to: `models/llama3-8b-q4.gguf`
+2. **Stage local offline assets**
+   Follow `OFFLINE_BUNDLE.md` for the ungated Qwen2.5 GGUF, faster-whisper
+   small model, CPU llama.cpp binaries and wheelhouse. They are not on GitHub.
 
 3. **Install Dependencies**
    ```bash
-   pip install -r requirements.txt
-   python install_dependencies.py
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -r requirements.txt
    ```
 
-4. **Download CUDA Binaries**
-   ```bash
-   python download_binaries.py
-   ```
-
-   **Note**: This downloads the CUDA-enabled llama.cpp binaries (~147MB) required for GPU acceleration.
+4. **Verify the offline bundle**
+   Run `.\.venv\Scripts\python.exe tools\check_offline_bundle.py` to check
+   local files and wheels without downloading or installing anything.
 
 5. **Launch JarvisAssistant**
    ```bash
-   python main.py
+   launch_jarvis.bat
    ```
+   This uses the project `.venv` when present. If you run `python main.py`
+   directly, make sure the `.venv` is activated first (`.\.venv\Scripts\Activate.ps1`)
+   or the system Python will report missing dependencies.
 
-## GPU Acceleration Setup
+## GPU Acceleration (Not Yet Available)
 
-### CUDA (NVIDIA)
-- Download and install [CUDA Toolkit 13.0+](https://developer.nvidia.com/cuda-toolkit)
-- The application will automatically detect and use GPU acceleration
-- Compatible with RTX 20/30/40 series cards
+The staged llama.cpp binaries are CPU-only. No CUDA toolkit or NVIDIA GPU is
+needed, and the app does not automatically detect GPU acceleration.
 
 ### Performance Expectations
-- **CPU-only**: 1-2 tokens/second
-- **GPU-accelerated**: 5-20+ tokens/second (depending on GPU)
+- **Bundled CPU**: roughly 7.5 tokens/second in a real smoke test on the
+  development machine; conversational replies took 18-19 seconds.
+- **GPU**: no supported binary staged or runtime validation completed.
 
 ## System Requirements
 
 ### Minimum
 - Windows 10/11
-- 8GB RAM
+- 16GB+ RAM recommended for the local model and speech pipeline
 - 10GB free disk space
 - Microphone and speakers
 
-### Recommended (GPU Acceleration)
+### Recommended
 - Windows 11
 - 16GB+ RAM
-- NVIDIA GPU with 8GB+ VRAM
-- CUDA Toolkit 13.0+
+- CPU inference (no GPU dependency)
 
 ## Features
-- 🎤 Voice recognition (offline)
-- 🧠 LLaMA 3 8B reasoning engine
-- 🔊 Text-to-speech synthesis
-- 🖥️ System monitoring dashboard
-- 💾 Conversation memory
-- 🚀 GPU acceleration support
-- 📱 Modern Flet UI
+- Offline faster-whisper speech recognition
+- Qwen2.5-7B-Instruct on local llama.cpp CPU binaries
+- Windows SAPI text-to-speech and system monitoring
+- Local Obsidian Markdown vault with review-gated knowledge
+- Deterministic Lute-inspired memory-action authorization
+- Flet desktop UI (not yet packaged as a portable release)
 
 ## Troubleshooting
 
@@ -73,14 +67,15 @@
 - Check microphone permissions
 - Adjust audio threshold in config
 
-### GPU Not Detected
-- Install latest NVIDIA drivers
-- Run `nvidia-smi` to verify CUDA installation
-- Check `install_dependencies.py` output
+### Memory Vault
+- The default vault is `memory/obsidian-vault/` (gitignored).
+- For an existing vault, set `JARVIS_OBSIDIAN_VAULT` to an absolute existing
+  folder before launching. See `OBSIDIAN_BRAIN.md` for review policies.
 
 ### Model Loading Errors
-- Verify model file is exactly `models/llama3-8b-q4.gguf`
-- Check file size is ~4.6GB
+- Verify model file is exactly `models/qwen2.5-7b-instruct-q4_k_m.gguf`
+- Check file size against `OFFLINE_BUNDLE.md`.
 - Ensure sufficient RAM available
 
-For more details, see `progress.txt` and the project documentation.
+For verified status see `JARVIS_STATE.md`, `CURRENT_ISSUES.md`, and
+`OBSIDIAN_BRAIN.md`. Offline bundle checks do not prove a packaged release.

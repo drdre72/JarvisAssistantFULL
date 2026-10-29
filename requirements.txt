@@ -1,6 +1,6 @@
 # JarvisAssistant Portable Windows Edition Requirements
 # Core UI and system monitoring
-flet>=0.21.0
+flet>=0.21.0,<0.22.0
 psutil>=5.9.0
 websockets>=11.0
 
@@ -8,6 +8,8 @@ websockets>=11.0
 pyaudio>=0.2.11
 pyttsx3>=2.90
 faster-whisper>=1.0.0
+numpy>=1.24.0,<2.0
+pygame>=2.5.0
 
 # Additional utilities
 pathlib2>=2.3.7

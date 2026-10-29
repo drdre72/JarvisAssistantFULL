@@ -27,10 +27,13 @@ class WhisperSTT:
             raise ImportError("faster-whisper is not available")
 
         # Get paths relative to portable structure
-        self.base_path = Path(__file__).parent.parent
+        self.base_path = Path(
+            os.environ.get("JARVIS_BASE_PATH", Path(__file__).resolve().parent.parent)
+        )
         self.models_path = self.base_path / "models"
 
         self.model_size = model_size
+        self.model_path = self.models_path / f"whisper-{model_size}"
         self.language = language
         self.device = device
 
@@ -47,12 +50,22 @@ class WhisperSTT:
 
     def _initialize_model(self):
         """Initialize the faster-whisper model"""
+        if not all(
+            (self.model_path / filename).is_file()
+            for filename in ("model.bin", "config.json")
+        ):
+            raise FileNotFoundError(
+                f"Offline Whisper model missing from {self.model_path} "
+                "(requires model.bin and config.json)"
+            )
+
         try:
-            print(f"[WhisperSTT] Loading {self.model_size} model...")
+            print(f"[WhisperSTT] Loading local model from {self.model_path}...")
             self.model = WhisperModel(
-                self.model_size,
+                str(self.model_path),
                 device=self.device,
-                compute_type="int8"  # Use quantized model for speed
+                compute_type="int8",  # Use quantized model for speed
+                local_files_only=True,
             )
             print(f"[WhisperSTT] Model loaded successfully")
         except Exception as e:

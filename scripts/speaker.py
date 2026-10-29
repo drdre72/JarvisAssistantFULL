@@ -1,9 +1,9 @@
 # speaker.py
-import subprocess
 import os
 import re
 import time
 import pygame
+import pyttsx3
 import threading
 
 # Global lock to prevent multiple TTS from playing simultaneously
@@ -19,8 +19,7 @@ def generate_filename_from_text(text: str) -> str:
 
 def speak(text: str):
     """
-    Speaks the given text by first checking for a matching local audio file.
-    If no file is found, it falls back to the system's 'say' command (TTS).
+    Speaks the given text using a local audio file or offline Windows TTS.
     """
     if not text:
         return
@@ -49,21 +48,11 @@ def speak(text: str):
             except Exception as e:
                 print(f"[Speaker] ERROR: Failed to play audio file '{filepath}'. Error: {e}")
                 
-        # --- 3. Fallback to TTS if file doesn't exist ---
+        # --- 3. Fallback to offline TTS if file doesn't exist ---
         print(f"[Speaker] No local file found for '{text}'. Using system TTS.")
         try:
-            # Use Windows SAPI TTS via PowerShell
-            powershell_cmd = f'powershell -Command "Add-Type -AssemblyName System.Speech; $speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; $speak.Speak(\'{text.replace("'", "''")}\')"'
-            subprocess.run(powershell_cmd, shell=True, check=True)
+            engine = pyttsx3.init()
+            engine.say(text)
+            engine.runAndWait()
         except Exception as e:
             print(f"[Speaker] TTS Error: {e}")
-            # Try alternative Windows TTS method
-            try:
-                import pyttsx3
-                engine = pyttsx3.init()
-                engine.say(text)
-                engine.runAndWait()
-            except ImportError:
-                print("[Speaker] pyttsx3 not available, TTS failed")
-            except Exception as e2:
-                print(f"[Speaker] Backup TTS failed: {e2}")

@@ -1,27 +1,30 @@
-# JarvisAssistant - Windows Portable Edition
+# JarvisAssistant - Offline Windows Development Build
 
-**🚀 Professional AI Assistant with GPU Acceleration**
+Local voice assistant with an inspectable, review-gated Obsidian memory vault.
 
-JarvisAssistant is a fully offline, portable AI assistant for Windows featuring advanced voice interaction, GPU-accelerated LLaMA 3 reasoning, and professional-grade performance.
+JarvisAssistant uses local faster-whisper speech recognition, Qwen2.5-7B
+inference on a staged llama.cpp CPU build, and offline Windows TTS. This is
+not yet a verified portable release. See `JARVIS_STATE.md` for current truth
+and `CURRENT_ISSUES.md` for limitations.
 
-## 🎯 Key Features
+## Key Features
 
-- **🎤 Offline Voice Recognition** - Fast, accurate speech-to-text with Whisper
-- **🧠 GPU-Accelerated AI** - LLaMA 3 8B model with CUDA acceleration
-- **🔊 Natural Speech Synthesis** - Windows SAPI integration
-- **💾 Conversation Memory** - Persistent chat history and context
-- **🖥️ System Monitoring** - Real-time performance dashboard
-- **📱 Modern UI** - Beautiful Flet interface with live metrics
-- **🚀 Portable Design** - Runs from USB stick, no external dependencies
+- **Offline Voice Recognition** - Fast, accurate speech-to-text with Whisper
+- **Local AI** - Qwen2.5-7B-Instruct on the staged CPU llama.cpp runtime
+- **Natural Speech Synthesis** - Windows SAPI integration
+- **Inspectable Memory** - Local Markdown vault with manually approved knowledge
+- **System Monitoring** - Real-time performance dashboard
+- **Desktop UI** - Flet interface with live metrics
+- **Offline Development** - Local-only runtime; portable build still unverified
 
-## ⚡ Performance
+## Performance
 
 | Configuration | Speed | Requirements |
 |--------------|-------|-------------|
-| **CPU-only** | 1-2 tokens/sec | 8GB RAM |
-| **GPU-accelerated** | 5-20+ tokens/sec | NVIDIA GPU + CUDA |
+| **Staged CPU runtime** | About 7.5 tokens/sec in a smoke test; 18-19s replies observed | 16GB+ RAM recommended |
+| **GPU runtime** | Not staged or tested | Separate future build |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Download & Setup
 ```bash
@@ -30,100 +33,100 @@ cd JarvisAssistantFULL
 ```
 
 ### 2. Download AI Model
-Download LLaMA 3 8B model (4.6GB): [Meta-Llama-3-8B-Instruct.Q4_K_M.gguf](https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/blob/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf)
+Stage the ungated Qwen2.5-7B-Instruct Q4_K_M GGUF, CPU llama.cpp
+binaries and faster-whisper files as documented in `OFFLINE_BUNDLE.md`.
+These assets are gitignored, not included on GitHub.
 
-Save as: `models/llama3-8b-q4.gguf`
+Save as: `models/qwen2.5-7b-instruct-q4_k_m.gguf`
 
 ### 3. Install Dependencies
 ```bash
-pip install -r requirements.txt
-python install_dependencies.py
+.\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -r requirements.txt
 ```
 
 ### 4. Launch
 ```bash
-python main.py
+launch_jarvis.bat
 ```
+This uses the project `.venv` when present; `python main.py` also works if your
+system Python already has the dependencies installed.
 
-## 🎮 GPU Acceleration
+## GPU Acceleration (Future)
 
-**For NVIDIA Users:**
-- Install [CUDA Toolkit 13.0+](https://developer.nvidia.com/cuda-toolkit)
-- Application auto-detects GPU and enables acceleration
-- Compatible with RTX 20/30/40 series cards
+The staged binaries are CPU-only. GPU offload defaults to zero; no CUDA
+toolkit or automatic GPU detection is needed for the current build.
 
-**Performance Boost:**
-- RTX A4500: 5.21 tokens/second (all 33 layers on GPU)
-- RTX 3080: ~8-12 tokens/second estimated
-- RTX 4090: ~15-20+ tokens/second estimated
+## Voice Interaction
 
-## 🎤 Voice Interaction
-
-1. **Wake Word**: Say "Jarvis" to activate
+1. **Start listening**: Use the microphone button; wake-word listening is disabled.
 2. **Natural Conversation**: Ask questions, give commands
 3. **Smart Responses**: Instant replies for common queries
-4. **Technical Awareness**: Jarvis knows about its own GPU acceleration!
+4. **Inspectable memory**: `OBSIDIAN_BRAIN.md` explains the local vault,
+   review queue and deterministic memory-action gate.
 
 **Example Interactions:**
-- *"Jarvis, are you using CUDA or CPU?"*
+- *"Jarvis, write this down: Call Mom tomorrow."*
+- *"Remember that I prefer short answers."* (saved for review)
+- *"What do you remember about my preferences?"* (approved notes only)
 - *"Tell me about your capabilities"*
 - *"What's my system status?"*
 - *"Can you hear me, Jarvis?"*
 
-## 🔧 Technical Architecture
+## Technical Architecture
 
 ```
 JarvisAssistant/
-├── main.py              # 🚀 Primary launcher
-├── bin/                 # 🔧 CUDA-enabled llama.cpp binaries
-├── models/              # 🧠 AI models (download separately)
-├── scripts/             # 📝 Core modules
-│   ├── reasoning.py     # 🤖 LLaMA 3 integration
-│   ├── speech_recognition.py # 🎤 Whisper STT
-│   ├── speaker.py       # 🔊 Windows TTS
-│   └── dispatcher.py    # 🎯 Command routing
-├── memory/              # 💾 Conversation persistence
-└── ui/                  # 📱 Flet interface
+main.py                      # Launcher and offline asset checks
+bin/                         # Ignored CPU llama.cpp binaries
+models/                      # Ignored local GGUF and Whisper models
+scripts/reasoning.py          # Qwen completion subprocess
+scripts/speech_recognition.py # Local faster-whisper
+scripts/speaker.py            # Offline Windows TTS
+scripts/dispatcher.py         # Deterministic command routing
+scripts/intent_gate.py        # Typed memory intent authorization
+scripts/obsidian_memory.py    # Markdown vault reader/writer
+memory/obsidian-vault/        # Ignored user-owned Obsidian vault
 ```
 
-## 📋 System Requirements
+## System Requirements
 
 ### Minimum
 - Windows 10/11 x64
-- 8GB RAM
+- 16GB+ RAM recommended for the local model and speech pipeline
 - 10GB free disk space
 - Microphone & speakers
 
 ### Recommended
 - Windows 11
 - 16GB+ RAM
-- NVIDIA GPU (8GB+ VRAM)
-- CUDA Toolkit 13.0+
+- CPU inference (no GPU binaries staged)
 
-## 🚀 Latest Updates
+## Latest Updates
 
-**v1.0 - GPU Acceleration Release**
-- ✅ CUDA Toolkit 13.0 integration
-- ✅ llama.cpp CUDA binaries (build 6490)
-- ✅ All 33 model layers GPU-accelerated
-- ✅ 5x+ performance improvement
-- ✅ Professional voice interaction pipeline
-- ✅ Real-world validation complete
+**Current development milestone:** offline voice conversation and local CPU
+inference were verified on this machine. The Obsidian vault and deterministic
+memory gate are implemented and unit-tested; live voice testing and release
+packaging remain open.
 
-## 📚 Documentation
+## Documentation
 
 - **Setup Guide**: See `SETUP.md` for detailed installation
-- **Development Log**: See `progress.txt` for technical details
+- **Current state and issues**: `JARVIS_STATE.md`, `CURRENT_ISSUES.md`
+- **Memory setup and review**: `OBSIDIAN_BRAIN.md`
+- **Development log**: `PROGRESS_LOG.md`
 - **Architecture**: See `PRD.txt` for project requirements
 
-## 🤝 Contributing
+## Contributing
 
-Contributions welcome! This is a complete Windows Portable AI Assistant ready for enhancement and customization.
+Contributions welcome. Packaging and a clean-machine network-disabled launch
+have not yet been verified. Run `tools/verify.ps1` for the current checks.
 
-## 📄 License
+## License
 
-MIT License - See LICENSE file for details
+No `LICENSE` file is present yet. Do not assume redistribution rights for
+this repository or its staged third-party assets.
 
 ---
 
-**🎯 Ready for Production Use** - Professional AI assistant with GPU acceleration, offline capabilities, and modern Windows integration.
+**Development status:** local voice conversation works on the development
+machine; Obsidian memory and the logic gate still need live UI validation.

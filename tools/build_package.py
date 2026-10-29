@@ -9,6 +9,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 def build_jarvis_package():
     """Build the complete JarvisAssistant portable package"""
 
@@ -18,7 +20,7 @@ def build_jarvis_package():
     print("=" * 60)
 
     # Get current directory
-    base_dir = Path(__file__).parent
+    base_dir = PROJECT_ROOT
 
     # Create build configuration
     main_script = base_dir / "main.py"
@@ -190,7 +192,7 @@ exe = EXE(
 )
 '''
 
-    with open("JarvisAssistant.spec", 'w') as f:
+    with open(PROJECT_ROOT / "JarvisAssistant.spec", 'w') as f:
         f.write(spec_content)
 
     print("✅ PyInstaller spec file created: JarvisAssistant.spec")
@@ -215,13 +217,13 @@ def install_build_dependencies():
 def check_package_size():
     """Check the size of various components"""
 
-    base_dir = Path(__file__).parent
+    base_dir = PROJECT_ROOT
 
     print("\n📊 Package Size Analysis:")
     print("-" * 40)
 
     components = {
-        "LLaMA Model": base_dir / "models" / "llama3-8b-q4.gguf",
+        "Local LLM": base_dir / "models" / "qwen2.5-7b-instruct-q4_k_m.gguf",
         "Binaries": base_dir / "bin",
         "Scripts": base_dir / "scripts",
         "UI Assets": base_dir / "ui"

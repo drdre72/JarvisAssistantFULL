@@ -11,8 +11,8 @@ def test_llama_basic():
     """Test llama.cpp with minimal parameters"""
 
     base_path = Path(__file__).parent
-    llama_exe = base_path / "bin" / "llama-cli.exe"
-    model_path = base_path / "models" / "llama3-8b-q4.gguf"
+    llama_exe = base_path / "bin" / "llama-completion.exe"
+    model_path = base_path / "models" / "qwen2.5-7b-instruct-q4_k_m.gguf"
 
     if not llama_exe.exists():
         print(f"❌ llama-cli.exe not found at {llama_exe}")

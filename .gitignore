@@ -1,15 +1,20 @@
 # Large model files (download separately)
 models/*.gguf
 models/*.bin
+models/whisper-*/
 
-# Large CUDA binaries (download via install script)
-bin/ggml-cuda.dll
+# Large llama.cpp binaries (download via install script)
+bin/*.dll
 bin/*.exe
 
 # Backup directories
 bin-cpu-backup/
 
 # Cache and temporary files
+.venv/
+.env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 *.pyo
@@ -51,6 +56,11 @@ whisper-source/
 # Package managers
 node_modules/
 package-lock.json
+wheelhouse/
 
 # Updates directory
 updates/
+
+# Verification reports and per-session hook tallies
+reports/
+.devin-context/tally_*.txt

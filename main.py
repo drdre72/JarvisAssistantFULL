@@ -65,8 +65,8 @@ def check_assets():
     base_path = Path(os.environ.get('JARVIS_BASE_PATH', '.'))
 
     required_assets = [
-        "bin/llama-cli.exe",
-        "models/llama3-8b-q4.gguf"
+        "bin/llama-completion.exe",
+        "models/qwen2.5-7b-instruct-q4_k_m.gguf"
     ]
 
     missing_assets = []
