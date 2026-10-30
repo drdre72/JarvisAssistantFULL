@@ -14,11 +14,22 @@
       next live UI session; unit tests and a real classifier call already pass.
 - [ ] Live-test the Obsidian vault with voice note-taking, candidate review,
       and an approved user-authored Knowledge note.
+- [ ] Live-test the local-only decision controller for approved note retrieval,
+      CPU/memory readings, and truthful offline responses.
+- [ ] User can author `Jarvis/Core/Purpose.md` in Obsidian and manually mark
+      it approved; Jarvis must not invent or create that identity statement.
+- [ ] Live-test purpose/tool questions and linked approved Knowledge recall;
+      only synthetic real-model/UI checks are done so far.
+- [ ] Validate graph indexing and source paths on a representative real
+      approved vault before relying on it for large-memory retrieval.
+- [ ] Retest the exact recognition-phrased Obsidian/tools question and
+      stopping voice during inference after restarting the app; gratitude
+      was verified live, but these two paths remain unverified.
 - [ ] Pin exact dependency versions from staged wheelhouse (issue #5).
 - [ ] Decide PyInstaller layout (one-file vs beside-exe assets) (issue #6).
 - [x] Obsidian memory design and ADR-0004 added (live UI test pending).
-- [ ] Review tracked files for secrets/private data; commit + push the
-      offline/Obsidian milestone as the user requested.
+- [ ] Review the controller diff and verify the offline bundle. No commit or
+      push was requested for this new milestone.
 
 ## Live runtime notes
 
@@ -32,6 +43,8 @@
 - Active memory: ignored `memory/obsidian-vault/Jarvis/` Markdown, or explicit
   `JARVIS_OBSIDIAN_VAULT` existing absolute directory. Legacy JSON is
   read-only context; Knowledge requires manually approved frontmatter.
+- Offline-only runtime remains binding. Optional outward APIs are deferred
+  until local brain/controller, security, functionality and UI are validated.
 - Parentless `llama-completion.exe` PID 10700 from an earlier run occupied
   ~7.1 GiB; user approved stopping it and it exited. Available RAM ~21.8 GiB.
 - 73 wheels in `wheelhouse/` installed into `.venv` via `--no-index`.
@@ -72,3 +85,29 @@
   Ported Lute's parse -> typed intent -> authorization memory gate. Removed
   UI's critical no-op fallback; corrected public setup docs. Full verify
   passed (32 tests); live vault/UI retest remains pending.
+- [2026-10-29 13:46] Added a local capability registry and a bounded offline
+  controller for approved-memory context, CPU/memory readings, ordinary
+  conversation and truthful fresh-data limitations. 50 tests and full
+  offline verification pass; live voice/UI behavior remains unverified.
+  A synthetic test note created during a failing test was removed with user
+  approval; tests now mock all default-vault writes.
+- [2026-10-29 13:48] Tightened selection: personal statements remain
+  conversational; approved-note source must survive re-read. 52 tests pass;
+  no network or general simulation capability was added.
+- [2026-10-29 14:02] User voice log showed 21-23s replies, model overclaiming
+  Obsidian edits, gratitude routing to inference, and a late reply after
+  stopping listening. Grounded capability and gratitude phrases locally;
+  voice-generation guard discards late spoken replies. 55 offline tests pass;
+  live retest after restart pending.
+- [2026-10-29 14:31] Follow-up live test: "Thank you, Jarvis." is fast, but
+  "do you recognize ... tools or the Obsidian?" missed the narrow visibility
+  matcher and produced another 22.8s model overclaim. Added a registry-backed
+  vault-access answer and recognition/manage/read variants with negative
+  statement coverage. Full offline verification passes (58 tests); restart
+  and retest the recognition question and voice-stop behavior.
+- [2026-10-30 08:07] Local-only intent foundation and approved wikilink graph
+  implemented. Reviewed user-owned purpose is read only from Core/Purpose.md;
+  typed model drafts cannot authorize actions or self-capability claims.
+  Knowledge links expand only approved notes with depth/size limits and
+  ID/path provenance. Offline suite 81 tests after a self-claim guard; synthetic real-model app path
+  passes with temporary vault. User vault notes untouched; no commit/push.

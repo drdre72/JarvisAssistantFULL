@@ -26,4 +26,8 @@ user-approved step that never runs during app operation.
 - pip resolution uses `--no-index` + `wheelhouse/`; `wheelhouse.sha256` is the
   tracked integrity manifest.
 - Any future feature needing network must be designed as an explicit,
-  user-consented, opt-in boundary — never a silent fallback.
+  user-consented, opt-in boundary - never a silent fallback.
+- Runtime network capabilities remain deferred until the local brain and
+  decision controller, permission security, functionality and UI have been
+  validated. The current controller may report that fresh data is needed,
+  but it cannot fetch it.

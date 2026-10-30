@@ -15,6 +15,14 @@
 - Active memory: local Obsidian-compatible Markdown vault under ignored
   `memory/obsidian-vault/`; an existing absolute vault can be opted in via
   `JARVIS_OBSIDIAN_VAULT`. Old JSON conversations remain read-only context.
+- Optional self-purpose record: only a user-authored, manually approved
+  `Jarvis/Core/Purpose.md` is read as Jarvis's declared goal. No file or
+  purpose text is bootstrapped by Jarvis; Obsidian is an optional editor.
+- A bounded, deterministic local decision controller now chooses whether to
+  consult approved knowledge, read local CPU/memory status, converse, or
+  explain that fresh external data is unavailable. No network capability
+  exists; an outward API phase is deferred until security, functionality
+  and UI are validated.
 
 ## Verified working
 
@@ -33,9 +41,10 @@
   prompts) to ignored `logs/runtime.log`. User verified multi-turn voice chat.
 - Supported voice command registry currently contains only local note-taking;
   unsupported macOS actions and avatar playback are not advertised.
-- Dispatcher now matches a leading "write this down" phrase locally and sends
-  other uncanned text directly to conversation. User log confirms there is
-  no intent stage; two CPU replies took 18.4s and 18.9s.
+- Dispatcher matches explicit note/review/recall phrases locally. A separate
+  controller then selects a local read-only path or one conversational reply;
+  it never runs a model intent classifier. Earlier user logs confirmed that
+  removal; two CPU replies took 18.4s and 18.9s.
 - Unit tests cover current time/date from the local clock and accurate UI/tool
   capability answers. Both avoid the model; live voice retest is pending.
 - Voice idle prompt points to the microphone button (keyless wake word is not
@@ -50,12 +59,29 @@
   runtime test has occurred after this change.
 - Required UI module imports now fail visibly instead of silently switching
   to no-op speech and memory functions; covered by regression tests.
+- Local capability registry and controller have unit/integration coverage:
+  81 tests pass, including approved-note source revalidation, no redundant
+  inference for metrics/live-data requests, and no transcript in decision
+  logs. A typed local-model proposal now handles uncanned conversation in one
+  inference pass; purpose and capability answers are grounded in the reviewed
+  profile or registry, not the model's draft. Synthetic offline Qwen tests
+  classified capability, self-purpose and ordinary-advice questions; live
+  voice/Obsidian retesting remains pending. A conservative self-claim guard
+  rejects model-authored ability/purpose claims when misclassified as dialogue.
+- Manually approved flat Knowledge notes now form a local wikilink graph.
+  Lexical matches expand through relevant outgoing approved links at most
+  two hops, six notes and 3500 Knowledge characters, preserving relationship,
+  optional note ID and source path. An in-memory index avoids re-reading all
+  note bodies on every request; selected sources are re-read before use.
+  Validator tests cover broken/unapproved links, duplicate IDs, invalid
+  dependency cycles, orphans and read-only CLI behavior. User vault notes
+  were not migrated, edited or auto-linked.
 
 ## Active issues (see CURRENT_ISSUES.md for the full list)
 
-1. **Latency:** the former 16s intent-classification pass has been removed
-   from the dispatch path; live voice retest is pending. CPU reply still
-   loads the model once per turn.
+1. **Latency:** CPU conversational replies still cold-load the model each
+   turn; the controller adds no extra model call. A live voice retest took
+   21-23 seconds per reply.
 2. Obsidian memory and action gate need live UI/microphone validation,
    including user-edited Knowledge approval and note-taking.
 3. Dead code: `ollama.Client()` in `jarvis_commands.py`, macOS `osascript`
@@ -64,7 +90,19 @@
 5. PyInstaller build unexercised; one-file layout vs launcher's beside-exe
    asset check is a known mismatch.
 6. `flet-video` optional and unstaged → avatar video placeholder.
-7. No LICENSE file despite README claim (MIT).
+7. No LICENSE file; README warns not to assume redistribution rights.
+8. Local capability registry records implementation and test evidence, but
+   not live health checks; decision rules are intentionally narrow, not a
+   general planner or simulation engine. Structured inference is still model
+   classification and can be wrong; ordinary dialogue drafts are unverified.
+   Graph relationships are also user-reviewed context, not verified truth.
+9. The live session exposed a partial transcription, an Obsidian capability
+   hallucination, and a reply arriving after voice deactivation. Routing
+   and late-reply suppression have unit coverage. A second session confirmed
+   gratitude routing but exposed "do you recognize ... tools or Obsidian?"
+   as another hallucination path; that phrase now has a local registry-backed
+   answer in tests. Live confirmation of the new route, voice-stop behavior,
+   and transcription quality is pending.
 
 ## Next architectural targets
 
@@ -72,10 +110,21 @@
    Knowledge in a live voice session; no user vault data was migrated.
 2. Test a real external Obsidian vault only after the user selects its path.
 3. Pin exact dependency versions (lockfile from staged wheelhouse).
-4. Improve lexical retrieval and optional reviewed legacy JSON migration;
-   keep memory, imagination, and facts separate per `AGENTS.md` rule 3.
-5. Sandboxed tool/thought execution boundary for commands.
-6. PyInstaller packaging once the app is stable in dev mode.
+4. Validate graph retrieval in a real reviewed vault, then consider fuller
+   YAML/link syntax, incremental indexing and optional reviewed legacy JSON
+   migration; keep memory, imagination and facts separate per rule 3.
+5. Test the controller in the live UI, then replace temporary phrase routing
+   with an offline intent-to-fulfillment flow: typed goal/constraints,
+   satisfaction conditions, capability selection, outcome verification, and
+   a supported answer or structured reason the goal could not be met. Carry
+   evidence-based capture/transcription/intent failure categories through
+   this flow to a polite, non-canned retry explanation. Fix the current
+   overflowing audio RMS calculation and recalibrate thresholds first; do
+   not claim noise/clipping causes without measured evidence. Preserve the
+   separate deterministic authorization boundary for actions.
+6. Build a sandboxed tool execution boundary and UI review controls before
+   any opt-in outward API connector.
+7. PyInstaller packaging once the app is stable in dev mode.
 
 ## Rules of interpretation
 

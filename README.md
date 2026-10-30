@@ -13,6 +13,8 @@ and `CURRENT_ISSUES.md` for limitations.
 - **Local AI** - Qwen2.5-7B-Instruct on the staged CPU llama.cpp runtime
 - **Natural Speech Synthesis** - Windows SAPI integration
 - **Inspectable Memory** - Local Markdown vault with manually approved knowledge
+- **Offline Decisions** - Local capability registry and a small rule-based
+  controller select relevant memory, CPU/memory readings, or a model reply
 - **System Monitoring** - Real-time performance dashboard
 - **Desktop UI** - Flet interface with live metrics
 - **Offline Development** - Local-only runtime; portable build still unverified
@@ -59,10 +61,12 @@ toolkit or automatic GPU detection is needed for the current build.
 ## Voice Interaction
 
 1. **Start listening**: Use the microphone button; wake-word listening is disabled.
-2. **Natural Conversation**: Ask questions, give commands
-3. **Smart Responses**: Instant replies for common queries
+2. **Natural Conversation**: Ask questions or use explicit local memory commands.
+3. **Local Responses**: Time, metrics and gratitude avoid inference; uncanned
+   questions use the local model and may take longer on a CPU.
 4. **Inspectable memory**: `OBSIDIAN_BRAIN.md` explains the local vault,
-   review queue and deterministic memory-action gate.
+   reviewed purpose profile, bounded approved-note wikilink graph, review
+   queue and deterministic memory-action gate.
 
 **Example Interactions:**
 - *"Jarvis, write this down: Call Mom tomorrow."*
@@ -85,6 +89,8 @@ scripts/speaker.py            # Offline Windows TTS
 scripts/dispatcher.py         # Deterministic command routing
 scripts/intent_gate.py        # Typed memory intent authorization
 scripts/obsidian_memory.py    # Markdown vault reader/writer
+scripts/capability_registry.py # Declared local abilities and evidence
+scripts/decision_controller.py # Bounded offline response selection
 memory/obsidian-vault/        # Ignored user-owned Obsidian vault
 ```
 
@@ -104,9 +110,10 @@ memory/obsidian-vault/        # Ignored user-owned Obsidian vault
 ## Latest Updates
 
 **Current development milestone:** offline voice conversation and local CPU
-inference were verified on this machine. The Obsidian vault and deterministic
-memory gate are implemented and unit-tested; live voice testing and release
-packaging remain open.
+inference were verified on this machine. The Obsidian vault, deterministic
+memory gate and first local-only decision controller are unit-tested; the
+new controller needs a live voice/UI test. No online tools, general-purpose
+simulation or portable release are available yet.
 
 ## Documentation
 

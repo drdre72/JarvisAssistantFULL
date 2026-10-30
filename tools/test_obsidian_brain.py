@@ -98,6 +98,59 @@ class ObsidianBrainTests(unittest.TestCase):
         self.assertIn("Pixel is a cat.", self.brain.recall("Pixel"))
         self.assertIn("Source: Jarvis/Knowledge/pixel.md", self.brain.get_conversation_context(query="Pixel"))
 
+    def test_purpose_requires_a_user_approved_note_and_never_bootstraps_itself(self):
+        core = self.brain.jarvis / "Core"
+        purpose = core / "Purpose.md"
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "missing")
+        self.assertFalse(core.exists())
+        core.mkdir()
+        purpose.write_text(
+            "---\njarvis_type: purpose\nreview_status: pending\n---\n\nHelp the user locally.\n",
+            encoding="utf-8",
+        )
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "pending")
+        purpose.write_text(
+            "---\njarvis_type: purpose\nreview_status: approved\n---\n\nHelp the user locally.\n",
+            encoding="utf-8",
+        )
+        record = self.brain.read_purpose()
+        self.assertEqual(record.text, "Help the user locally.")
+        self.assertEqual(record.source, "Jarvis/Core/Purpose.md")
+        self.assertEqual(record.review_status, "approved")
+        self.assertEqual(self.brain.purpose_status(), "approved")
+        purpose.write_text(
+            "---\nreview_status: approved\n---\n\nHelp the user locally.\n",
+            encoding="utf-8",
+        )
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "invalid")
+        purpose.write_text(
+            "---\njarvis_type: purpose\nreview_status: pending\n"
+            "review_status: approved\n---\n\nHelp the user locally.\n",
+            encoding="utf-8",
+        )
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "invalid")
+
+    def test_purpose_status_reports_oversized_body_as_invalid(self):
+        core = self.brain.jarvis / "Core"
+        core.mkdir()
+        purpose = core / "Purpose.md"
+        purpose.write_text(
+            "---\njarvis_type: purpose\nreview_status: pending\n---\n\n" + "x" * 2001 + "\n",
+            encoding="utf-8",
+        )
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "invalid")
+        purpose.write_text(
+            "---\njarvis_type: purpose\n---\n\nHelp the user locally.\n",
+            encoding="utf-8",
+        )
+        self.assertIsNone(self.brain.read_purpose())
+        self.assertEqual(self.brain.purpose_status(), "invalid")
+
     def test_legacy_json_is_read_only_and_context_is_chronological(self):
         memory_dir = self.base / "memory"
         memory_dir.mkdir()

@@ -14,6 +14,7 @@ from speaker import speak
 from intent_gate import authorized, parse_intent
 from obsidian_memory import get_brain
 from runtime_log import get_runtime_logger
+from capability_registry import CapabilityRegistry
 
 def simple_command_check(text: str):
     """Check for simple commands without using LLM"""
@@ -28,17 +29,30 @@ def simple_command_check(text: str):
         speak("Hello, sir. How may I assist you?")
         return True
 
+    if normalized in {"thank you", "thank you jarvis", "thanks", "thanks jarvis"}:
+        speak("You're welcome, sir.")
+        return True
+
+    ability_question = re.search(
+        r"\b(?:can|could|do|does|are) you (?:able to )?"
+        r"(?:see|view|access|inspect|recognize|use|manage|edit|update|"
+        r"write|search|read|organize|look at)\b",
+        normalized,
+    )
+    if ability_question and re.search(r"\b(?:obsidian|vault|notes?)\b", normalized):
+        speak(CapabilityRegistry().describe_vault_access())
+        return True
+
     # Ground capability and clock answers in implemented features and local time.
     if (
-        re.search(r"\b(?:tools?|ui|user interface|screen)\b", normalized)
-        and re.search(r"\b(?:see|view|access|inspect)\b", normalized)
-        and normalized.startswith(("can you", "do you", "are you"))
-    ):
-        speak(
-            "I can converse offline, save a note when you say write this down, "
-            "and display CPU and memory status. I cannot view my screen or "
-            "user interface or inspect arbitrary tools, sir."
+        re.search(r"\bcan you see\b", normalized)
+        or (
+            ability_question and re.search(
+                r"\b(?:tools?|ui|user interface|screen)\b", normalized
+            )
         )
+    ):
+        speak(CapabilityRegistry().describe())
         return True
 
     clock_question = re.sub(r"^(?:jarvis|please|can you tell me|tell me)\s+", "", normalized)
@@ -60,48 +74,13 @@ def simple_command_check(text: str):
 
     # Capability questions (check first for priority)
     if any(phrase in text_lower for phrase in ['capabilities', 'what can you do', 'your abilities', 'system capabilities']):
-        speak("I can converse offline, listen to your voice, monitor the system, and save notes locally. Other tools are not enabled yet.")
+        speak(CapabilityRegistry().describe())
         return True
 
     # Identity/name questions
     identity_question = normalized.removeprefix("jarvis ").removesuffix(" jarvis")
-    if identity_question in {'what is your name', 'who are you', 'your name', 'what are you'}:
+    if identity_question in {'what is your name', 'your name'}:
         speak("I am JARVIS, your personal AI assistant, sir.")
-        return True
-
-    # Status check responses
-    if any(phrase in text_lower for phrase in ['how are you', 'status', 'online', 'working', 'functioning']):
-        speak("All systems operational, sir. I'm functioning normally.")
-        return True
-
-    # Reasoning/model questions
-    if any(phrase in text_lower for phrase in ['reasoning', 'model', 'thinking', 'brain']):
-        speak("My reasoning systems are online but running at reduced capacity to ensure responsiveness, sir.")
-        return True
-
-    # Can you hear me
-    if any(phrase in text_lower for phrase in ['can you hear', 'hear me', 'listening']):
-        speak("Yes sir, I can hear you clearly. Audio systems are functioning normally.")
-        return True
-
-    # File/system questions
-    if any(phrase in text_lower for phrase in ['manipulate files', 'local files', 'file access', 'can you access']):
-        speak("I can save notes locally, but general file access is not enabled yet.")
-        return True
-
-    # Help requests
-    if any(word in text_lower for word in ['help', 'assist', 'support']):
-        speak("I can converse offline, check basic status, or save a note when you say write this down.")
-        return True
-
-    # AI/technology questions
-    if any(phrase in text_lower for phrase in ['artificial intelligence', 'about ai', 'technology', 'machine learning']):
-        speak("Artificial intelligence is a fascinating field focused on creating systems that can perform tasks requiring human-like intelligence, sir.")
-        return True
-
-    # System info
-    if any(phrase in text_lower for phrase in ['system info', 'computer specs', 'hardware']):
-        speak("I can show live CPU and memory use in the dashboard, but I cannot confirm detailed hardware specifications yet.")
         return True
 
     return False
@@ -122,7 +101,7 @@ def process(text: str):
 
     # Filter out common phantom phrases that shouldn't trigger processing
     phantom_phrases = [
-        "thank you", "thank you for your time", "thanks", "bye", "goodbye",
+        "bye", "goodbye",
         "orders sir", "orders, sir", "orders", "sir"
     ]
 

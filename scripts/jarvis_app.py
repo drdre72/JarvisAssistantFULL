@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import time
+import re
 from datetime import datetime
 
 # Setup paths for portable structure
@@ -20,8 +21,12 @@ from jarvis_commands import commands
 from speaker import speak
 from dispatcher import process as process_command
 from reasoning import get_reasoning_engine
-from obsidian_memory import remember_conversation, get_conversation_context
+from obsidian_memory import remember_conversation, get_conversation_context, get_brain
 from speech_recognition import WhisperSTT
+from decision_controller import OfflineDecisionController
+from capability_registry import CapabilityRegistry
+from semantic_intent import INTENT_SCHEMA, parse_hypothesis, fulfill
+from runtime_log import get_runtime_logger
 
 _whisper_stt = None
 
@@ -50,11 +55,16 @@ ORANGE = "#ff6b35"
 WHITE = "#ffffff"
 WHITE70 = "#b3b3b3"
 BLACK = "#0a0a0a"
+STARTUP_GREETING = (
+    "Good day, sir. I am JARVIS, Just a Rather Very Intelligent System. "
+    "Ready when you are."
+)
 
 class JarvisApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.is_listening = False
+        self._voice_generation = 0
         self.avatar_playing = False
         self.voice_thread = None
         self.system_monitor_thread = None
@@ -72,8 +82,8 @@ class JarvisApp:
     def startup_sequence(self):
         """Display welcome message and auto-start voice mode"""
         # Add welcome message to chat
-        self.add_chat_message("Jarvis", "Good day, sir. J.A.R.V.I.S. systems are online and ready for your commands.", True)
-        speak("Good day, sir. J.A.R.V.I.S. systems are online and ready for your commands.")
+        self.add_chat_message("Jarvis", STARTUP_GREETING, True)
+        speak(STARTUP_GREETING)
         
         # Auto-start voice recognition after greeting
         def delayed_voice_start():
@@ -130,7 +140,7 @@ class JarvisApp:
 
     def setup_page(self):
         """Configure the main application window"""
-        self.page.title = "J.A.R.V.I.S. - Just A Rather Very Intelligent System"
+        self.page.title = "JARVIS - Just a Rather Very Intelligent System"
         self.page.bgcolor = BLACK
         self.page.padding = 0
         self.page.spacing = 0
@@ -179,7 +189,7 @@ class JarvisApp:
                             color=ORANGE,
                         ),
                         ft.Text(
-                            "J.A.R.V.I.S.",
+                            "JARVIS",
                             size=12,
                             weight=ft.FontWeight.BOLD,
                             color=ORANGE,
@@ -248,7 +258,7 @@ class JarvisApp:
         return ft.Container(
             content=ft.Row([
                 ft.Text(
-                    "J.A.R.V.I.S.",
+                    "JARVIS",
                     size=32,
                     weight=ft.FontWeight.BOLD,
                     color=ORANGE,
@@ -501,7 +511,7 @@ class JarvisApp:
         self.activity_text.value = message
         self.page.update()
     
-    def process_user_command(self, user_input):
+    def process_user_command(self, user_input, voice_generation=None):
         """Process user command through JARVIS system"""
         try:
             # Check for direct commands first
@@ -510,25 +520,119 @@ class JarvisApp:
                 speak("Goodbye, sir. JARVIS systems standing by.")
                 return
             
-            # Check for conversation mode trigger
-            if "speak freely" in user_input.lower() or "conversation" in user_input.lower():
-                self.add_chat_message("Jarvis", "Of course, sir. I am here to assist.", True)
-                speak("Of course, sir. I am here to assist.")
-                return
-            
             # Use JARVIS dispatcher to process command
             self.set_activity("Checking your request locally...")
             result = process_command(user_input)
             
-            # If no specific command found, use conversation mode
             if result == 'CONTINUE_LOOP':
+                self.set_activity("Choosing a local response...")
+                decision = OfflineDecisionController().decide(user_input)
+                get_runtime_logger().info(
+                    "decision strategy=%s reason=%s capability=%s",
+                    decision.strategy, decision.reason_code, decision.capability or "none",
+                )
+                if decision.strategy == "respond":
+                    if not decision.reply:
+                        raise ValueError("Local response was empty")
+                    self.add_chat_message("Jarvis", decision.reply, True)
+                    speak(decision.reply)
+                    return
+                if decision.strategy == "local_metrics":
+                    try:
+                        cpu = psutil.cpu_percent(interval=None)
+                        memory = psutil.virtual_memory().percent
+                        if not (0 <= cpu <= 100 and 0 <= memory <= 100):
+                            raise ValueError("Invalid local metrics")
+                        response = (
+                            f"Local CPU usage is {cpu:.1f}% and memory usage is "
+                            f"{memory:.1f}%, sir."
+                        )
+                    except Exception as error:
+                        get_runtime_logger().warning(
+                            "decision metrics failed type=%s", type(error).__name__
+                        )
+                        response = "I cannot read local CPU and memory status right now, sir."
+                    self.add_chat_message("Jarvis", response, True)
+                    speak(response)
+                    return
+                if decision.strategy == "conversation":
+                    self.set_activity("Understanding your request locally...")
+                    try:
+                        context = get_conversation_context(3, query=None)
+                        reasoning_engine = get_reasoning_engine()
+                        if reasoning_engine is None:
+                            raise RuntimeError("Local reasoning is unavailable")
+                        raw = reasoning_engine.generate_structured_response(
+                            user_input, INTENT_SCHEMA, context=context
+                        )
+                        if voice_generation is not None and (
+                            not self.is_listening
+                            or self._voice_generation != voice_generation
+                        ):
+                            get_runtime_logger().info("voice reply discarded after deactivation")
+                            return
+                        hypothesis = parse_hypothesis(raw, original_text=user_input)
+                        self.set_activity("Checking local evidence...")
+                        assessment = fulfill(
+                            hypothesis,
+                            CapabilityRegistry(),
+                            lambda: get_brain().read_purpose(),
+                            lambda: get_brain().purpose_status(),
+                        )
+                        get_runtime_logger().info(
+                            "fulfillment status=%s reason=%s sources=%s",
+                            assessment.status, assessment.reason_code, len(assessment.evidence),
+                        )
+                        response = assessment.content
+                    except (OSError, RuntimeError, ValueError) as error:
+                        get_runtime_logger().warning(
+                            "intent unavailable type=%s", type(error).__name__
+                        )
+                        if voice_generation is not None and (
+                            not self.is_listening
+                            or self._voice_generation != voice_generation
+                        ):
+                            return
+                        response = (
+                            "I could not determine your intent from the local model just now, "
+                            "sir. Please try again."
+                        )
+                        assessment = None
+                    self.add_chat_message("Jarvis", response, True)
+                    if assessment is not None and assessment.status == "generated":
+                        try:
+                            remember_conversation(user_input, response)
+                        except (OSError, ValueError) as memory_error:
+                            get_runtime_logger().warning(
+                                "dialogue save failed type=%s", type(memory_error).__name__
+                            )
+                    speak(response)
+                    return
+                if decision.strategy != "retrieve_approved":
+                    raise ValueError("Unsupported local decision")
+                self.set_activity("Reading approved local knowledge...")
+                context = get_conversation_context(3, query=decision.memory_query)
+                approved_section = context.split("\n\nRecent dialogue (unverified", 1)[0]
+                approved_sources = set(
+                    re.findall(
+                        r"(?m)^Source: Jarvis/Knowledge/([^\r\n]+)$",
+                        approved_section,
+                    )
+                )
+                source_present = bool(approved_sources.intersection(decision.sources))
+                if not context.startswith("User-reviewed vault notes") or not source_present:
+                    response = "I could not verify that approved note just now, sir."
+                    self.add_chat_message("Jarvis", response, True)
+                    speak(response)
+                    return
+
+                # If no specific command found, use conversation mode
                 self.set_activity("Generating a reply locally...")
                 # Send to conversation AI using our reasoning engine
                 try:
                     reasoning_engine = get_reasoning_engine()
                     if reasoning_engine:
                         # Include conversation context for better responses
-                        context = get_conversation_context(3, query=user_input)
                         enhanced_prompt = self.create_jarvis_persona_prompt()
                         if context:
                             enhanced_prompt += f"\n\nRecent conversation context:\n{context}"
@@ -539,6 +643,12 @@ class JarvisApp:
                             max_tokens=512,
                             temperature=0.7
                         )
+                        if voice_generation is not None and (
+                            not self.is_listening
+                            or self._voice_generation != voice_generation
+                        ):
+                            get_runtime_logger().info("voice reply discarded after deactivation")
+                            return
                         self.add_chat_message("Jarvis", assistant_response, True)
                         try:
                             remember_conversation(user_input, assistant_response)
@@ -565,13 +675,14 @@ class JarvisApp:
 
     def create_jarvis_persona_prompt(self):
         """Create the JARVIS persona prompt for conversation mode"""
-        return """You are JARVIS (Just A Rather Very Intelligent System), Tony Stark's AI assistant. 
+        return """You are JARVIS (Just a Rather Very Intelligent System), a user-owned offline companion.
         You are sophisticated, polite, and efficient. You address the user as "sir" and maintain a professional yet friendly demeanor.
         You are helpful, intelligent, and have a slight sense of humor when appropriate.
         Keep responses concise but informative. You are running entirely offline.
         You can converse using local speech input and output. The app shows
-        basic CPU and memory status, and the supported voice command "write
-        this down" saves a local note. If asked about your tools, explain these
+        basic CPU and memory status. "Write this down" saves an unverified
+        note, "remember that" queues a candidate for review, and approved
+        Knowledge can be recalled locally. If asked about your tools, explain these
         available capabilities rather than saying you have no tools.
         Obsidian memory is a local Markdown vault. Recent dialogue is
         unverified, model replies are generated content, and only user-reviewed
@@ -640,6 +751,8 @@ class JarvisApp:
     def start_voice_recognition(self):
         """Start listening for voice commands using faster-whisper"""
         self.is_listening = True
+        self._voice_generation += 1
+        voice_generation = self._voice_generation
         self.add_chat_message("Jarvis", "Voice recognition activated. I'm listening, sir.", True)
         speak("Voice recognition activated. I'm listening.")
 
@@ -651,6 +764,8 @@ class JarvisApp:
                 try:
                     # Use our new speech recognition
                     user_input = listen_and_transcribe(duration=5)
+                    if not self.is_listening or self._voice_generation != voice_generation:
+                        break
 
                     if not user_input or not user_input.strip():
                         consecutive_empty += 1
@@ -670,7 +785,7 @@ class JarvisApp:
                         self.page.update()  # Force UI update
 
                         # Then process the command
-                        self.process_user_command(user_input)
+                        self.process_user_command(user_input, voice_generation=voice_generation)
 
                 except Exception as e:
                     print(f"Voice recognition error: {e}")
@@ -682,6 +797,7 @@ class JarvisApp:
     def stop_voice_recognition(self):
         """Stop voice recognition"""
         self.is_listening = False
+        self._voice_generation += 1
         self.add_chat_message("Jarvis", "Voice recognition deactivated, sir.", True)
         speak("Voice recognition deactivated.")
 
@@ -777,12 +893,13 @@ class JarvisApp:
         threading.Thread(target=time_worker, daemon=True).start()
         
         # Initial welcome message
-        self.add_chat_message("assistant", "Good day, sir. J.A.R.V.I.S. systems are online and ready for your commands.")
+        self.add_chat_message("assistant", STARTUP_GREETING)
 
     def cleanup(self):
         """Clean up resources when app closes"""
         self.should_monitor = False
         self.is_listening = False
+        self._voice_generation += 1
 
 def main(page: ft.Page):
     """Main application entry point"""
