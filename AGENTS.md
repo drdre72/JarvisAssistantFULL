@@ -28,7 +28,7 @@ session-scoped notes belong in `.devin-context/memory.md`.
    testing safeguards, not the long-term decision architecture. Model text
    may propose a plan but never authorize side effects.
 
-## Communication failure contract (target; not yet implemented)
+## Communication failure contract (partially implemented)
 
 - A voice turn passes through capture, transcription, semantic intent
   interpretation, and fulfillment. Each stage should return a typed outcome
@@ -44,11 +44,15 @@ session-scoped notes belong in `.devin-context/memory.md`.
   cause. Classify only when the relevant evidence exists. Loudness alone
   cannot prove background noise or clipping; a failed intent parse does not
   establish an audio fault. If evidence conflicts, report uncertainty.
-- Audio diagnosis first needs correct normalized sample metrics, clipping
-  fraction, recording stop reason, and a calibrated speech/noise estimate.
-  The current `speech_recognition.py` squares `int16` samples before widening:
-  this overflows (samples at amplitude 30000 can yield RMS 0). Its current
-  numeric thresholds must be recalibrated along with any arithmetic fix.
+- `speech_recognition.py` now widens PCM16 samples before squaring, records
+  raw/normalized RMS, clipping fraction, stop reason and basic transcription
+  status. Capture waits up to five seconds for activity and can then record
+  up to twelve seconds, stopping after two seconds of trailing quiet.
+  A turn stopped by the speech deadline cannot authorize even an explicit
+  memory command because the transcript may be incomplete. These are
+  measurements/safety guards, not calibrated acoustic diagnoses. The fixed
+  activity threshold still needs calibration with real recordings, plus a
+  measured speech/noise estimate.
   Transcription quality signals require validation against real recordings
   before being treated as calibrated confidence.
 - A constrained offline response renderer should turn the typed outcome into

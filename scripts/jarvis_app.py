@@ -42,6 +42,11 @@ def listen_and_transcribe(duration=5):
         print(f"[WhisperSTT] Error: {e}")
         return ""
 
+
+def capture_reached_limit(capture):
+    """A time-limited transcript may end mid-request and cannot authorize actions."""
+    return capture is not None and capture.stop_reason == "max_speech_duration"
+
 # Import flet-video for proper video support
 try:
     from flet_video import Video, VideoMedia, PlaylistMode
@@ -767,10 +772,20 @@ class JarvisApp:
                     if not self.is_listening or self._voice_generation != voice_generation:
                         break
 
+                    capture = getattr(_whisper_stt, "last_capture", None)
+                    if capture_reached_limit(capture):
+                        notice = (
+                            "Recording reached its time limit, so I may have missed the end "
+                            "of your request. Please repeat it in shorter parts."
+                        )
+                        self.add_chat_message("Jarvis", notice, True)
+                        speak(notice)
+                        continue
+
                     if not user_input or not user_input.strip():
                         consecutive_empty += 1
                         if consecutive_empty >= max_empty:
-                            print("[Voice] No speech detected, going back to sleep")
+                            print("[Voice] Three captures without usable transcription; pausing")
                             self.is_listening = False
                             idle_message = "Voice listening paused, sir. Use the microphone button to resume."
                             self.add_chat_message("Jarvis", idle_message, True)

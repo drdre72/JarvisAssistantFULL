@@ -179,7 +179,7 @@ class LlamaReasoning:
             "Use self_purpose for questions about who you are, your own role, "
             "purpose or intent. Use purpose_status only when the user explicitly "
             "references the purpose file itself, such as Purpose.md or the purpose "
-            "note. Questions about your "
+            "note. Questions about your current operational health "
             "are capability questions; do not assert health without a measurement. "
             "Use dialogue for ordinary conversation or advice about how the user "
             "could do something themselves. Use unclear only if the user's goal "

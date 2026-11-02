@@ -7,10 +7,32 @@ import os
 import tempfile
 import wave
 import time
+from collections import deque
+from dataclasses import dataclass
+from math import ceil
 from pathlib import Path
 import pyaudio
-import threading
 import numpy as np
+
+from runtime_log import get_runtime_logger
+
+
+@dataclass(frozen=True)
+class CaptureMetrics:
+    stop_reason: str
+    seconds: float
+    rms: float
+    normalized_rms: float
+    clipped_fraction: float
+
+
+def pcm16_metrics(data):
+    samples = np.frombuffer(data, dtype=np.int16).astype(np.float64)
+    if not samples.size:
+        return 0.0, 0.0
+    rms = float(np.sqrt(np.mean(samples * samples)))
+    clipped = float(np.count_nonzero(np.abs(samples) >= 32760) / samples.size)
+    return rms, clipped
 
 try:
     from faster_whisper import WhisperModel
@@ -85,6 +107,7 @@ class WhisperSTT:
 
         if not self.model:
             print("[WhisperSTT] Model not loaded")
+            self.last_transcription_status = "model_unavailable"
             return ""
 
         try:
@@ -101,34 +124,43 @@ class WhisperSTT:
                 transcription_parts.append(segment.text.strip())
 
             transcription = ' '.join(transcription_parts).strip()
+            self.last_transcription_status = "ok" if transcription else "empty"
             return transcription
 
         except Exception as e:
             print(f"[WhisperSTT] Transcription error: {e}")
+            self.last_transcription_status = "failed"
             return ""
 
-    def listen_and_transcribe(self, duration=5, silence_threshold=25):
+    def listen_and_transcribe(self, duration=5, silence_threshold=25, max_speech_seconds=12):
         """
-        Record audio from microphone and transcribe
+        Wait for speech, then record until a pause or a bounded speech deadline.
 
         Args:
-            duration: Maximum recording duration in seconds
-            silence_threshold: Audio level threshold for silence detection (increased default)
+            duration: Maximum time to wait for speech to begin, in seconds
+            silence_threshold: Provisional raw PCM16 RMS activity threshold;
+                requires calibration against real recordings.
+            max_speech_seconds: Maximum recording time after detected activity.
 
         Returns:
             Transcribed text string
         """
 
+        if duration <= 0 or max_speech_seconds <= 0 or silence_threshold < 0:
+            raise ValueError("Audio capture limits must be positive")
+
+        self.last_capture = None
+        self.last_transcription_status = "not_attempted"
         # Add delay to avoid picking up TTS output
         time.sleep(1.5)
 
-        print(f"[WhisperSTT] Listening for {duration} seconds...")
-
-        # Initialize PyAudio
-        audio = pyaudio.PyAudio()
-
+        print(f"[WhisperSTT] Waiting up to {duration} seconds for speech...")
+        audio = None
+        stream = None
+        temp_path = None
+        stage = "capture"
         try:
-            # Open microphone stream
+            audio = pyaudio.PyAudio()
             stream = audio.open(
                 format=self.audio_format,
                 channels=self.channels,
@@ -138,79 +170,81 @@ class WhisperSTT:
             )
 
             frames = []
+            pre_roll = deque(maxlen=max(1, ceil(0.3 * self.sample_rate / self.chunk_size)))
+            waited_chunks = 0
+            waiting_energy = 0.0
+            waiting_samples = 0
+            waiting_clipped = 0.0
             silent_chunks = 0
-            max_silent_chunks = int(self.sample_rate / self.chunk_size * 2)  # 2 seconds of silence
-
-            for _ in range(int(self.sample_rate / self.chunk_size * duration)):
+            wait_chunks = ceil(self.sample_rate * duration / self.chunk_size)
+            speech_chunks = ceil(self.sample_rate * max_speech_seconds / self.chunk_size)
+            pause_chunks = ceil(self.sample_rate * 2 / self.chunk_size)
+            stop_reason = "no_activity"
+            while True:
                 data = stream.read(self.chunk_size)
+                rms_level, clipped_fraction = pcm16_metrics(data)
+                if not frames:
+                    if rms_level > silence_threshold:
+                        frames.extend(pre_roll)
+                        frames.append(data)
+                        pre_roll.clear()
+                    else:
+                        pre_roll.append(data)
+                        waited_chunks += 1
+                        sample_count = len(data) // 2
+                        waiting_energy += rms_level * rms_level * sample_count
+                        waiting_clipped += clipped_fraction * sample_count
+                        waiting_samples += sample_count
+                        if waited_chunks >= wait_chunks:
+                            break
+                    continue
                 frames.append(data)
-
-                # Improved silence detection using RMS level
-                audio_data = np.frombuffer(data, dtype=np.int16)
-                # Handle edge case that causes sqrt warning
-                mean_square = np.mean(audio_data**2)
-                rms_level = np.sqrt(max(mean_square, 0))
-
-                # Debug logging for audio levels (remove after testing)
-                if rms_level > silence_threshold * 0.1:  # Only log when there's some audio
-                    print(f"[WhisperSTT] Audio level: {rms_level:.1f} (threshold: {silence_threshold})")
-
-                if rms_level < silence_threshold:
-                    silent_chunks += 1
-                else:
+                if rms_level > silence_threshold:
                     silent_chunks = 0
-
-                # Stop if we've had enough silence
-                if silent_chunks > max_silent_chunks and len(frames) > self.sample_rate / self.chunk_size:
-                    print("[WhisperSTT] Silence detected, stopping recording")
+                else:
+                    silent_chunks += 1
+                if silent_chunks >= pause_chunks:
+                    stop_reason = "trailing_silence"
+                    break
+                if len(frames) >= speech_chunks:
+                    stop_reason = "max_speech_duration"
                     break
 
             stream.stop_stream()
             stream.close()
+            stream = None
 
-            # Save audio to temporary WAV file
+            recorded = b"".join(frames)
+            overall_rms, clipped_fraction = pcm16_metrics(recorded)
+            if stop_reason == "no_activity" and waiting_samples:
+                overall_rms = float(np.sqrt(waiting_energy / waiting_samples))
+                clipped_fraction = waiting_clipped / waiting_samples
+            measured_chunks = waited_chunks if stop_reason == "no_activity" else len(frames)
+            self.last_capture = CaptureMetrics(
+                stop_reason, measured_chunks * self.chunk_size / self.sample_rate,
+                overall_rms, overall_rms / 32768.0, clipped_fraction,
+            )
+            get_runtime_logger().info(
+                "audio capture stop=%s seconds=%.2f rms=%.1f clipped_fraction=%.4f",
+                stop_reason, self.last_capture.seconds, overall_rms, clipped_fraction,
+            )
+            if stop_reason == "no_activity":
+                print("[WhisperSTT] No above-threshold activity during capture")
+                return ""
+            print(f"[WhisperSTT] Processing audio (RMS: {overall_rms:.1f}; stop: {stop_reason})")
+
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
                 temp_path = temp_file.name
+            with wave.open(temp_path, "wb") as wav_file:
+                wav_file.setnchannels(self.channels)
+                wav_file.setsampwidth(audio.get_sample_size(self.audio_format))
+                wav_file.setframerate(self.sample_rate)
+                wav_file.writeframes(recorded)
 
-                # Write WAV file
-                with wave.open(temp_path, 'wb') as wav_file:
-                    wav_file.setnchannels(self.channels)
-                    wav_file.setsampwidth(audio.get_sample_size(self.audio_format))
-                    wav_file.setframerate(self.sample_rate)
-                    wav_file.writeframes(b''.join(frames))
-
-            # Check if we actually recorded meaningful audio
-            if len(frames) < self.sample_rate / self.chunk_size * 0.5:  # Less than 0.5 seconds of audio
-                print("[WhisperSTT] Insufficient audio data, skipping transcription")
-                try:
-                    os.unlink(temp_path)
-                except:
-                    pass
-                return ""
-
-            # Calculate overall audio level to verify actual speech
-            all_audio_data = np.frombuffer(b''.join(frames), dtype=np.int16)
-            overall_mean_square = np.mean(all_audio_data**2)
-            overall_rms = np.sqrt(max(overall_mean_square, 0))
-
-            if overall_rms < 10:  # Fixed threshold based on your actual audio levels (20-60 range)
-                print(f"[WhisperSTT] Audio too quiet (RMS: {overall_rms:.1f}), likely no speech")
-                try:
-                    os.unlink(temp_path)
-                except:
-                    pass
-                return ""
-
-            print(f"[WhisperSTT] Processing audio (RMS: {overall_rms:.1f})")
-
-            # Transcribe the recorded audio
+            stage = "transcription"
             transcription = self.transcribe_audio_file(temp_path)
-
-            # Clean up temporary file
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
+            if self.last_transcription_status == "not_attempted":
+                self.last_transcription_status = "ok" if transcription else "empty"
 
             # Additional validation on transcription result
             if transcription:
@@ -225,10 +259,12 @@ class WhisperSTT:
                 # If transcription is too short or matches phantom phrases, ignore it
                 if len(transcription.strip()) < 3:
                     print(f"[WhisperSTT] Transcription too short: '{transcription}'")
+                    self.last_transcription_status = "filtered"
                     return ""
 
                 if transcription_lower in phantom_phrases:
                     print(f"[WhisperSTT] Filtering phantom transcription: '{transcription}'")
+                    self.last_transcription_status = "filtered"
                     return ""
 
                 print(f"[WhisperSTT] Valid transcription: '{transcription}'")
@@ -236,11 +272,29 @@ class WhisperSTT:
             return transcription
 
         except Exception as e:
-            print(f"[WhisperSTT] Recording error: {e}")
+            print(f"[WhisperSTT] {stage.capitalize()} error: {e}")
+            if stage == "capture":
+                get_runtime_logger().warning("audio capture failed type=%s", type(e).__name__)
+                self.last_capture = CaptureMetrics("capture_failed", 0.0, 0.0, 0.0, 0.0)
+            else:
+                get_runtime_logger().warning("audio transcription failed type=%s", type(e).__name__)
+                self.last_transcription_status = "failed"
             return ""
 
         finally:
-            audio.terminate()
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except Exception:
+                    pass
+            if audio is not None:
+                audio.terminate()
+            if temp_path is not None:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
     def is_available(self):
         """Check if speech recognition is available"""

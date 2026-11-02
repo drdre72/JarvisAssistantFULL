@@ -78,6 +78,10 @@ class RuntimeFlowTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["stdin"], subprocess.DEVNULL)
         self.assertNotIn("What is your intent?", str(logger.return_value.info.call_args_list))
         self.assertEqual(engine.conversation_history, [])
+        instruction = command[command.index("-p") + 1]
+        self.assertIn("Questions about your current operational health", instruction)
+        self.assertIn("purpose_status only when the user explicitly", instruction)
+        self.assertNotIn("Questions about your are capability", instruction)
 
     def test_structured_inference_fails_closed_on_process_errors(self):
         engine = self.engine_without_assets()
@@ -150,6 +154,34 @@ class RuntimeFlowTests(unittest.TestCase):
         remember.assert_called_once_with("Checking in", "Doing well, thank you.")
         engine.generate_response.assert_not_called()
         engine.generate_structured_response.assert_called_once()
+
+    def test_time_limited_voice_capture_cannot_execute_partial_request(self):
+        import jarvis_app
+        from speech_recognition import CaptureMetrics
+
+        app = object.__new__(jarvis_app.JarvisApp)
+        app.page = SimpleNamespace(update=Mock())
+        app.is_listening = False
+        app._voice_generation = 0
+        app.add_chat_message = Mock()
+        app.process_user_command = Mock()
+        capture = CaptureMetrics("max_speech_duration", 12.0, 40.0, 0.001, 0.0)
+        with patch.object(jarvis_app, "_whisper_stt", SimpleNamespace(last_capture=capture)):
+            with patch.object(jarvis_app, "listen_and_transcribe",
+                              return_value="write this down: partial") as listen:
+                with patch.object(jarvis_app.threading, "Thread") as thread:
+                    def stop_after_notice(message):
+                        if "time limit" in message:
+                            app.is_listening = False
+
+                    with patch.object(jarvis_app, "speak",
+                                      side_effect=stop_after_notice) as speak:
+                        app.start_voice_recognition()
+                        thread.call_args.kwargs["target"]()
+
+        listen.assert_called_once()
+        app.process_user_command.assert_not_called()
+        self.assertIn("time limit", speak.call_args.args[0])
 
     def test_deactivated_voice_session_discards_late_inference_reply(self):
         import jarvis_app

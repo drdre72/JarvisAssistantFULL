@@ -118,9 +118,10 @@
    satisfaction conditions, capability selection, outcome verification, and
    a supported answer or structured reason the goal could not be met. Carry
    evidence-based capture/transcription/intent failure categories through
-   this flow to a polite, non-canned retry explanation. Fix the current
-   overflowing audio RMS calculation and recalibrate thresholds first; do
-   not claim noise/clipping causes without measured evidence. Preserve the
+   this flow to a polite, non-canned retry explanation. PCM16 RMS arithmetic
+   is corrected and bounded wait/speech windows prevent two common cutoff
+   paths; thresholds and diagnostic categories still need live calibration.
+   Do not claim noise/clipping causes without measured evidence. Preserve the
    separate deterministic authorization boundary for actions.
 6. Build a sandboxed tool execution boundary and UI review controls before
    any opt-in outward API connector.

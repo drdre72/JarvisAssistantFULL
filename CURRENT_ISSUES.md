@@ -82,14 +82,17 @@ Numbered buglist. States: ACTIVE, OPEN, PENDING VERIFY, RESOLVED, EXTERNAL.
     inference is not cancelled, only its late reply discarded. The earlier
     partial transcription's cause is unknown.
 17. Audio/intent failure diagnosis - OPEN. The current voice path reduces
-    low audio, empty or filtered transcription, and capture/model errors to
-    an empty string; the UI treats them as one silence count. `WhisperSTT`
-    squares `int16` samples before widening, so RMS can overflow (amplitude
-    30000 produced RMS 0 in a check); existing thresholds cannot be trusted
-    for diagnosing quiet speech, clipping or background noise. Introduce
-    measured, calibrated stage-specific diagnostics and structured retry
-    guidance before making causal claims or allowing uncertain speech to
-    authorize actions. No category-based feedback is implemented yet.
+    empty or filtered transcription and capture/model errors to an empty
+    string; the UI counts attempts without a usable transcript and pauses
+    after three, but cannot yet give a stage-specific explanation. PCM16 RMS
+    overflow is fixed; capture records corrected RMS, clipping fraction and
+    stop reason, with separate status for basic transcription failures.
+    Speech can begin within a five-second window and continue up to twelve
+    seconds; a time-limited transcript is never dispatched as an action.
+    Threshold 25 is provisional, not calibrated against this microphone.
+    Do not infer quiet speech, clipping or background noise from raw levels
+    alone. Live microphone tests, calibrated speech/noise estimates and a
+    constrained diagnostic renderer with actionable retry guidance remain.
 18. Semantic intent/identity live validation - PENDING VERIFY. The new local
     structured model path can distinguish self-purpose, capability inquiry,
     ordinary dialogue and ambiguity without a second classifier call. Its
